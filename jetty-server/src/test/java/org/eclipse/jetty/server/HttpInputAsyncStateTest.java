@@ -22,14 +22,12 @@ import static org.eclipse.jetty.server.HttpInput.EARLY_EOF_CONTENT;
 import static org.eclipse.jetty.server.HttpInput.EOF_CONTENT;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Collections;
 import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -58,6 +56,7 @@ public class HttpInputAsyncStateTest
     private ByteBuffer _expected = BufferUtil.allocate(16*1024);
     private boolean _eof;
     private boolean _noReadInDataAvailable;
+    private boolean _completeInOnDataAvailable;
     
     private final ReadListener _listener = new ReadListener()
     {
@@ -71,8 +70,11 @@ public class HttpInputAsyncStateTest
         public void onDataAvailable() throws IOException
         {
             __history.add("onDataAvailable");
-            if (!_noReadInDataAvailable)
-                readAvailable();
+            if (!_noReadInDataAvailable && readAvailable() && _completeInOnDataAvailable)
+            {
+                __history.add("complete");
+                _state.complete();
+            }
         }
 
         @Override
@@ -182,8 +184,13 @@ public class HttpInputAsyncStateTest
                     _in.run();
                     break;
                     
+                case TERMINATED:
                 case WAIT: 
                     break loop;
+                    
+                case COMPLETE: 
+                    __history.add("COMPLETE");
+                    break;
                     
                 default:
                     Assert.fail();
@@ -217,7 +224,7 @@ public class HttpInputAsyncStateTest
         }
     }
     
-    void readAvailable() throws IOException
+    boolean readAvailable() throws IOException
     {
         int len=0;
         try
@@ -233,7 +240,7 @@ public class HttpInputAsyncStateTest
                     __history.add("read -1");
                     assertTrue(BufferUtil.isEmpty(_expected));
                     assertTrue(_eof);
-                    return;
+                    return true;
                 }
                 else
                 {
@@ -253,6 +260,7 @@ public class HttpInputAsyncStateTest
             __history.add("read "+e);
             throw e;
         }
+        return false;
     }
     
     
@@ -711,5 +719,32 @@ public class HttpInputAsyncStateTest
         
         wake();
         check("onAllDataRead");   
+    }
+
+    @Test
+    public void testReadAndCompleteInOnDataAvailable() throws Exception
+    {
+        _completeInOnDataAvailable = true;
+        handle(()->
+        {
+            _state.startAsync(null);
+            _in.setReadListener(_listener);
+            check("onReadUnready");       
+        });
+
+        check("asyncReadFillInterested");
+        
+        deliver(new TContent("Hello"),EOF_CONTENT);
+        check("onReadPossible true","onReadPossible false");
+        
+        handle(()->{__history.add(_state.getState().toString());});
+        System.err.println(__history);
+        check(
+            "onDataAvailable",
+            "read 5",
+            "read -1",
+            "complete",
+            "COMPLETE"
+            ); 
     }
 }

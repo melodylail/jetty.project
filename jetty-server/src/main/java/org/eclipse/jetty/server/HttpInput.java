@@ -801,6 +801,8 @@ public class HttpInput extends ServletInputStream implements Runnable
         synchronized (_inputQ)
         {
             listener = _listener;
+            if (_channelState.isAsyncComplete())
+                return;
             
             if (_state == EOF)
                 return;
@@ -861,7 +863,7 @@ public class HttpInput extends ServletInputStream implements Runnable
                     if (_state == AEOF)
                     {
                         _state = EOF;
-                        aeof = true;
+                        aeof = !_channelState.isAsyncComplete();
                     }
                 }
                 if (aeof)

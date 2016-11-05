@@ -1008,6 +1008,14 @@ public class HttpChannelState
         }
     }
 
+    public boolean isAsyncComplete()
+    {
+        try(Locker.Lock lock= _locker.lock())
+        {
+            return _async==Async.COMPLETE;
+        }
+    }
+
     public boolean isAsync()
     {
         try(Locker.Lock lock= _locker.lock())
