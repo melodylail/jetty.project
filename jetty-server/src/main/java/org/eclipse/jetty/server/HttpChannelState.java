@@ -1168,6 +1168,31 @@ public class HttpChannelState
         }
         return woken;
     }
+    
+    /* ------------------------------------------------------------ */
+    /** Called to signal that a read has read -1.
+     * Will wake if the read was called while in ASYNC_WAIT state
+     * @return true if woken
+     */
+    public boolean onReadEof()
+    {
+        boolean woken=false;
+        try(Locker.Lock lock= _locker.lock())
+        {
+            if(DEBUG)
+                LOG.debug("onReadEof {}",toStringLocked());
+            
+            if (_state==State.ASYNC_WAIT)
+            {
+                _state=State.ASYNC_WOKEN;
+                _asyncReadUnready=true;
+                _asyncReadPossible=true;
+                woken=true;
+            }
+        }
+        return woken;
+    }
+
 
     public boolean isReadPossible()
     {
