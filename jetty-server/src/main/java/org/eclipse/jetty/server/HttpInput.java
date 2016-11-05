@@ -356,11 +356,11 @@ public class HttpInput extends ServletInputStream implements Runnable
             // If it is EOF, consume it here
             if (content instanceof SentinelContent)
             {
-                if (content == EARLY_EOF_CONTENT)
-                    _state = EARLY_EOF;
-                else if (content instanceof EofContent)
+                if (content instanceof EofContent)
                 {
-                    if (_listener == null)
+                    if (content == EARLY_EOF_CONTENT)
+                        _state = EARLY_EOF;
+                    else if (_listener == null)
                         _state = EOF;
                     else
                         _state = AEOF;
@@ -747,7 +747,7 @@ public class HttpInput extends ServletInputStream implements Runnable
                     _state = ASYNC;
                     woken = _channelState.onReadReady();
                 }
-                else if (_state instanceof EOFState)
+                else if (_state == EOF)
                 {
                     _state = AEOF;
                     woken = _channelState.onReadReady();
@@ -794,8 +794,8 @@ public class HttpInput extends ServletInputStream implements Runnable
     @Override
     public void run()
     {
-        final Throwable error;
         final ReadListener listener;
+        Throwable error;
         boolean aeof = false;
 
         synchronized (_inputQ)
@@ -805,24 +805,34 @@ public class HttpInput extends ServletInputStream implements Runnable
             if (_state == EOF)
                 return;
 
-            if (_state == AEOF)
+            if (_state==AEOF)
             {
                 _state = EOF;
                 aeof = true;
             }
-            
-            error = _state instanceof ErrorState?((ErrorState)_state).getError():null;
+             
+            error = _state.getError();
             
             if (!aeof && error==null)
             {
                 Content content = pollReadableContent();
+
+                // Consume EOF
                 if (content instanceof EofContent)
                 {
-                    _state = EOF;
-                    aeof = true;
                     content.succeeded();
                     if (_content==content)
                         _content = null;
+                    if (content == EARLY_EOF_CONTENT)
+                    {
+                        _state = EARLY_EOF;
+                        error = _state.getError();
+                    }
+                    else 
+                    {
+                        _state = EOF;
+                        aeof = true;
+                    }
                 }
                 else if (content==null)
                 {
@@ -999,6 +1009,11 @@ public class HttpInput extends ServletInputStream implements Runnable
         {
             return -1;
         }
+        
+        public Throwable getError()
+        {
+            return null;
+        }
     }
 
     protected static class EOFState extends State
@@ -1070,13 +1085,18 @@ public class HttpInput extends ServletInputStream implements Runnable
         @Override
         public int noContent() throws IOException
         {
-            throw new EofException("Early EOF");
+            throw getError();
         }
 
         @Override
         public String toString()
         {
             return "EARLY_EOF";
+        }
+        
+        public IOException getError()
+        {
+            return new EofException("Early EOF");
         }
     };
 
