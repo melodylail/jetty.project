@@ -1150,7 +1150,41 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
             }
         }
     }
+    
+    /* ------------------------------------------------------------ */
+    protected void requestInitialized(Request baseRequest, HttpServletRequest request)
+    {
+        // Handle the REALLY SILLY request events!
+        if (!_servletRequestAttributeListeners.isEmpty())
+            for (ServletRequestAttributeListener l :_servletRequestAttributeListeners)
+                baseRequest.addEventListener(l);
 
+        if (!_servletRequestListeners.isEmpty())
+        {
+            final ServletRequestEvent sre = new ServletRequestEvent(_scontext,request);
+            for (ServletRequestListener l : _servletRequestListeners)
+                l.requestInitialized(sre);
+        }
+    }
+
+    /* ------------------------------------------------------------ */
+    protected void requestDestroyed(Request baseRequest, HttpServletRequest request)
+    {
+        // Handle more REALLY SILLY request events!
+        if (!_servletRequestListeners.isEmpty())
+        {
+            final ServletRequestEvent sre = new ServletRequestEvent(_scontext,request);
+            for (int i=_servletRequestListeners.size();i-->0;)
+                _servletRequestListeners.get(i).requestDestroyed(sre);
+        }
+
+        if (!_servletRequestAttributeListeners.isEmpty())
+        {
+            for (int i=_servletRequestAttributeListeners.size();i-->0;)
+                baseRequest.removeEventListener(_servletRequestAttributeListeners.get(i));
+        }
+    }
+    
     /* ------------------------------------------------------------ */
     /**
      * @see org.eclipse.jetty.server.handler.ScopedHandler#doHandle(java.lang.String, org.eclipse.jetty.server.Request, javax.servlet.http.HttpServletRequest,
@@ -1164,19 +1198,7 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         try
         {
             if (new_context)
-            {
-                // Handle the REALLY SILLY request events!
-                if (!_servletRequestAttributeListeners.isEmpty())
-                    for (ServletRequestAttributeListener l :_servletRequestAttributeListeners)
-                        baseRequest.addEventListener(l);
-
-                if (!_servletRequestListeners.isEmpty())
-                {
-                    final ServletRequestEvent sre = new ServletRequestEvent(_scontext,request);
-                    for (ServletRequestListener l : _servletRequestListeners)
-                        l.requestInitialized(sre);
-                }
-            }
+                requestInitialized(baseRequest,request);
 
             switch(dispatch)
             {
@@ -1207,22 +1229,8 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         }
         finally
         {
-            // Handle more REALLY SILLY request events!
             if (new_context)
-            {
-                if (!_servletRequestListeners.isEmpty())
-                {
-                    final ServletRequestEvent sre = new ServletRequestEvent(_scontext,request);
-                    for (int i=_servletRequestListeners.size();i-->0;)
-                        _servletRequestListeners.get(i).requestDestroyed(sre);
-                }
-
-                if (!_servletRequestAttributeListeners.isEmpty())
-                {
-                    for (int i=_servletRequestAttributeListeners.size();i-->0;)
-                        baseRequest.removeEventListener(_servletRequestAttributeListeners.get(i));
-                }
-            }
+                requestDestroyed(baseRequest,request);
         }
     }
 
