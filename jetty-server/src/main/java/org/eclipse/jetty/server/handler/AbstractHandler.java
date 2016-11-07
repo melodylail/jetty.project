@@ -54,6 +54,7 @@ public abstract class AbstractHandler extends ContainerLifeCycle implements Hand
     {
     }
 
+    /* ------------------------------------------------------------ */
     @Override
     public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException
     {

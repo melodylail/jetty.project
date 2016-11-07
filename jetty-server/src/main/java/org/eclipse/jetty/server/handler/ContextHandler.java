@@ -1127,16 +1127,7 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
             if (LOG.isDebugEnabled())
                 LOG.debug("context={}|{}|{} @ {}",baseRequest.getContextPath(),baseRequest.getServletPath(), baseRequest.getPathInfo(),this);
 
-            // start manual inline of nextScope(target,baseRequest,request,response);
-            if (never())
-                nextScope(target,baseRequest,request,response);
-            else if (_nextScope != null)
-                _nextScope.doScope(target,baseRequest,request,response);
-            else if (_outerScope != null)
-                _outerScope.doHandle(target,baseRequest,request,response);
-            else
-                doHandle(target,baseRequest,request,response);
-            // end manual inline (pathentic attempt to reduce stack depth)
+            nextScope(target,baseRequest,request,response);
         }
         finally
         {
@@ -1203,25 +1194,16 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
                     if (Boolean.TRUE.equals(baseRequest.getAttribute(Dispatcher.__ERROR_DISPATCH)))
                         break;
                     
-                    Object error = request.getAttribute(Dispatcher.ERROR_STATUS_CODE);
-                    // We can just call sendError here.  If there is no error page, then one will
+                    // We can just call doError here.  If there is no error page, then one will
                     // be generated. If there is an error page, then a RequestDispatcher will be
                     // used to route the request through appropriate filters etc.
-                    response.sendError((error instanceof Integer)?((Integer)error).intValue():500);
+                    doError(target,baseRequest,request,response);
                     return;
                 default:
                     break;
             }
 
-            // start manual inline of nextHandle(target,baseRequest,request,response);
-            // noinspection ConstantIfStatement
-            if (never())
-                nextHandle(target,baseRequest,request,response);
-            else if (_nextScope != null && _nextScope == _handler)
-                _nextScope.doHandle(target,baseRequest,request,response);
-            else if (_handler != null)
-                _handler.handle(target,baseRequest,request,response);
-            // end manual inline
+            nextHandle(target,baseRequest,request,response);
         }
         finally
         {
@@ -1243,9 +1225,6 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
             }
         }
     }
-
-
-
 
     /**
      * @param request A request that is applicable to the scope, or null
